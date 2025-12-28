@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Nishi: Forest & Physics Integrated</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; user-select: none; font-family: monospace; touch-action: none; }
+        #export-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; flex-direction: column; align-items: center; justify-content: center; }
+        #export-text { width: 90%; height: 60%; background: #111; color: #0f0; border: 1px solid #0f0; font-family: monospace; padding: 10px; font-size: 10px; white-space: pre; overflow: auto; }
+        #btn-close-export { margin-top: 10px; padding: 10px 20px; background: #333; color: white; border: 1px solid #fff; cursor: pointer; font-size: 14px;}
+        #loading-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        #loading-bar { width: 200px; height: 4px; background: #333; margin-top: 10px; }
+        #loading-fill { height: 100%; width: 0%; background: #a00; transition: width 0.2s; }
+        #loading-text { margin-top: 10px; color: #888; font-size: 12px; }
+        #hud-layer { position: absolute; top: 10px; left: 10px; color: cyan; z-index: 4000; pointer-events: none; }
+        #debug-text { font-size: 14px; color: yellow; margin-top: 5px; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5000; }
+        #interact-btn { position: absolute; top: 50%; right: 20%; transform: translateY(-50%); width: 100px; height: 100px; background: rgba(255, 255, 255, 0.15); border: 3px solid rgba(255, 255, 255, 0.8); border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 40px; color: white; cursor: pointer; pointer-events: auto; backdrop-filter: blur(2px); }
+        #flashlight-btn, #day-btn { position: absolute; top: 20px; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; pointer-events: auto; z-index: 6000; }
+        #flashlight-btn { right: 160px; background: rgba(0, 0, 0, 0.5); border: 2px solid white; color: white; }
+        #day-btn { right: 220px; background: rgba(255, 255, 0, 0.3); border: 2px solid yellow; color: yellow; }
+        #choice-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 99999; flex-direction: column; align-items: center; justify-content: center; }
+        #choice-box { border: 2px solid #a00; background: #111; padding: 20px; text-align: center; width: 80%; max-width: 400px; box-shadow: 0 0 30px #a00; }
+        h2 { color: #a00; margin: 0 0 15px 0; font-family: serif; letter-spacing: 2px; }
+        .choice-btn { display: block; width: 100%; padding: 15px; margin: 10px 0; background: #222; color: white; border: 1px solid #555; font-size: 16px; cursor: pointer; text-transform: uppercase; }
+        #editor-ui { position: absolute; top: 0; right: 0; width: 170px; height: 100%; background: rgba(0,0,0,0.9); border-left: 1px solid #555; display: flex; flex-direction: column; padding: 5px; box-sizing: border-box; z-index: 8000; pointer-events: auto; overflow-y: auto; }
+        button { background: #333; color: white; border: 1px solid #666; padding: 8px 2px; margin: 2px 0; font-weight: bold; font-size: 9px; cursor: pointer; }
+        .input-row { display: flex; gap: 2px; margin: 5px 0; align-items: center; }
+        input[type="number"] { width: 50%; background: #222; color: cyan; border: 1px solid cyan; font-family: monospace; padding: 5px; font-size: 11px; }
+        input[type="color"] { width: 100%; height: 25px; border: none; background: none; }
+        input[type="range"] { width: 100%; }
+        #btn-set-scale { width: 40%; background: #004488; color: cyan; border: 1px solid cyan; }
+        #btn-save { background: #006600; border-color: #00ff00; color: #fff; margin-bottom: 10px; font-size: 12px; }
+        #btn-target { background: #444; border-color: yellow; color: yellow; margin-bottom: 5px; word-wrap: break-word;}
+        .label { color: #888; font-size: 9px; text-align: center; margin-top: 5px; border-top: 1px solid #333; padding-top: 2px;}
+        .row { display: flex; gap: 2px; }
+        .row button { flex: 1; }
+        #joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 140px; height: 140px; border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; pointer-events: auto; z-index: 4000; }
+        #joystick-knob { width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        #look-zone { position: absolute; top: 0; left: 50%; width: 50%; height: 100%; pointer-events: auto; z-index: 3000; }
+        .special-btn { background: #552200; border: 1px solid #ff8800; color: #ffaa00; }
+        .copy-btn { background: #002255; border: 1px solid #0088ff; color: #00aaff; }
+    </style>
+</head>
+<body>
+    <div id="export-overlay">
+        <h2 style="color: #0f0;">GENERATED CODE</h2>
+        <textarea id="export-text"></textarea>
+        <button id="btn-close-export" onclick="closeExport()">CLOSE</button>
+    </div>
+
+    <div id="choice-modal"><div id="choice-box"><h2>THE THIRD CALL</h2><p style="color:#aaa;">Something is listening...</p><button class="choice-btn" onclick="handleChoice(1)">Force Open</button><button class="choice-btn" onclick="handleChoice(2)">Read Ayatul Kursi</button><button class="choice-btn" onclick="closeModal()">Back</button></div></div>
+    <div id="loading-screen"><h2>NISHI</h2><div id="loading-status">Loading Assets...</div><div id="loading-text">0%</div><div id="loading-bar"><div id="loading-fill"></div></div></div>
+    <div id="hud-layer"><div id="debug-text">-</div></div>
+    <div id="ui-layer"><div id="day-btn" onclick="toggleDayNight()">☀️</div><div id="flashlight-btn">🔦</div><div id="interact-btn">✋</div><div style="position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background:white; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0.7;"></div></div>
+    
+    <div id="editor-ui">
+        <button id="btn-save" onclick="generateData()">💾 GET CODE</button>
+        <div class="label">OBJECT CONTROLS</div>
+        <button id="btn-target" onclick="cycleTarget()">TARGET: HOUSE</button>
+        <div class="row"><button class="copy-btn" onclick="duplicateObject()">© COPY</button><button class="special-btn" onclick="flipObject()">↔ FLIP</button></div>
+        <div class="label">MATERIAL / LIGHT</div>
+        <div class="input-row"><span style="color:#aaa; font-size:9px;">COLOR:</span><input type="color" id="color-input" onchange="updateMaterial('color')"></div>
+        <div class="label">REFLECTION (Shiny)</div><input type="range" id="roughness-input" min="0" max="1" step="0.1" onchange="updateMaterial('roughness')">
+        <div class="label">MANUAL SCALE</div><div class="input-row"><input type="number" id="scale-input" step="0.001" placeholder="0.000"><button id="btn-set-scale" onclick="applyManualScale()">SET</button></div>
+        <div class="label">MOVE (Pos)</div>
+        <div class="row"><button onclick="adjust('pos', 1, 1)">Left</button><button onclick="adjust('pos', 1, -1)">Right</button></div>
+        <div class="row"><button onclick="adjust('pos', 2, -1)">Fwd</button><button onclick="adjust('pos', 2, 1)">Back</button></div>
+        <div class="row"><button onclick="adjust('pos', 0, 1)">Up</button><button onclick="adjust('pos', 0, -1)">Down</button></div>
+        <div class="label">ROTATE</div>
+        <div class="row"><button onclick="adjust('rot', 1, 1)">Y (Turn)</button><button onclick="adjust('rot', 1, -1)">-Y</button></div>
+        <div class="row"><button onclick="adjust('rot', 0, 1)">X (Vert)</button><button onclick="adjust('rot', 0, -1)">-X</button></div>
+        <div class="row"><button onclick="adjust('rot', 2, 1)">Z (Tilt)</button><button onclick="adjust('rot', 2, -1)">-Z</button></div>
+        <div class="label">SPEED</div><button onclick="toggleStep()" id="btn-step">0.1</button>
+    </div>
+
+    <div id="joystick-zone"><div id="joystick-knob"></div></div>
+    <div id="look-zone"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        let moveFwd = 0, moveSide = 0, doorMixers = [], doorActions = [], doorSounds = [], doorStates = [false, false, false, false], collidableMeshList = [], interactionList = [];    
+        let flashlight, starSystem, moon, isFlashlightOn = false, isDay = false, ambient, moonlight, footstepSound = null, footstepTimer = 0;
+        let treeColliders = [], doorSoundBuffer = null;
+        const footstepInterval = 0.65;
+        let targets = [], targetIndex = 0, step = 0.1;
+        const clock = new THREE.Clock(), raycaster = new THREE.Raycaster(), center = new THREE.Vector2(0, 0); 
+        let lookedAtDoorIndex = -1, frameCount = 0; 
+        const PLAYER_HEIGHT = 2.0, PLAYER_SPEED = 0.10;
+
+        const scene = new THREE.Scene(); 
+        scene.background = new THREE.Color(0x050510); 
+        scene.fog = new THREE.FogExp2(0x050510, 0.02); 
+        const camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 1000); 
+        camera.rotation.order = "YXZ"; 
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+
+        ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
+        moonlight = new THREE.DirectionalLight(0xccccff, 0.5); 
+        moonlight.position.set(46.600, 9.100, 8.000); 
+        scene.add(moonlight);
+        
+        flashlight = new THREE.SpotLight(0xffffff, 0, 50, 0.6, 0.5, 1); scene.add(flashlight); scene.add(flashlight.target);
+
+        const renderer = new THREE.WebGLRenderer({antialias: false, powerPreference: "high-performance"}); 
+        renderer.setSize(window.innerWidth, window.innerHeight); document.body.appendChild(renderer.domElement);
+
+        const gltfLoader = new THREE.GLTFLoader();
+        const audioLoader = new THREE.AudioLoader();
+        const textureLoader = new THREE.TextureLoader();
+
+        const texBas = textureLoader.load('file:///android_asset/texture/png/bas.png');
+        const texBedKat = textureLoader.load('file:///android_asset/texture/png/bed_kat.png');
+        const texKat = textureLoader.load('file:///android_asset/texture/png/kat.png');
+        [texBas, texBedKat, texKat].forEach(t => { t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping; });
+
+        audioLoader.load('file:///android_asset/sound/creaky_door.wav', (buffer) => { doorSoundBuffer = buffer; });
+        audioLoader.load('file:///android_asset/sound/footstep.wav', (buffer) => {
+            footstepSound = new THREE.Audio(listener);
+            footstepSound.setBuffer(buffer);
+            footstepSound.setVolume(0.4);
+        });
+
+        function createSky() {
+            const starGeo = new THREE.BufferGeometry(); const starCount = 1500; const starPos = new Float32Array(starCount * 3);
+            for(let i=0; i<starCount*3; i+=3) {
+                const r = 200 + Math.random() * 200; const theta = 2 * Math.PI * Math.random(); const phi = Math.acos(2 * Math.random() - 1);
+                starPos[i] = r * Math.sin(phi) * Math.cos(theta); starPos[i+1] = r * Math.sin(phi) * Math.sin(theta); starPos[i+2] = r * Math.cos(phi);
+            }
+            starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+            starSystem = new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 0.8, transparent: true, opacity: 0.9, fog: false}));
+            scene.add(starSystem);
+            const moonTexture = textureLoader.load('file:///android_asset/texture/png/moon.png'); 
+            moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTexture, color: 0xffffff, transparent: true, rotation: 0.2, fog: false }));
+            moon.position.set(46.600, 9.100, 8.000); 
+            moon.scale.set(2.000, 2.000, 1); 
+            scene.add(moon);
+            targets.push({ id: 'moon', name: 'MOON', obj: moon });
+        }
+
+        function build3DForest() {
+            const treeUrl = 'file:///android_asset/texture/3dmodels/tree.glb';
+            gltfLoader.load(treeUrl, function(gltf) {
+                const treeMaster = gltf.scene;
+                treeMaster.traverse((c) => { if(c.isMesh) { c.castShadow = false; c.receiveShadow = false; c.material.side = THREE.DoubleSide; } });
+                for(let i=0; i<12; i++) {
+                    const x = (Math.random()-0.5)*150; const z = (Math.random()-0.5)*150;
+                    if(Math.abs(x) < 20 && Math.abs(z) < 20) continue; 
+                    const tree = treeMaster.clone(); tree.position.set(x, 0, z);
+                    const s = 0.4 + Math.random() * 0.4; tree.scale.set(s, s, s);
+                    tree.rotation.y = Math.random() * Math.PI;
+                    scene.add(tree); treeColliders.push({ x: x, z: z, radius: 1.0 });
+                }
+            });
+        }
+
+        window.toggleDayNight = function() {
+            if (listener.context.state === 'suspended') listener.context.resume();
+            isDay = !isDay;
+            const btn = document.getElementById('day-btn');
+            if(isDay) {
+                scene.background = new THREE.Color(0x87CEEB); scene.fog.color.setHex(0x87CEEB); scene.fog.density = 0; 
+                ambient.intensity = 0.8; moonlight.intensity = 0.0; 
+                if(starSystem) starSystem.visible = false; if(moon) moon.visible = false; 
+                btn.innerText = "🌙"; btn.style.backgroundColor = "rgba(0,0,0,0.5)";
+            } else {
+                scene.background = new THREE.Color(0x050510); scene.fog.color.setHex(0x050510); scene.fog.density = 0.02; 
+                ambient.intensity = 0.4; moonlight.intensity = 0.5; 
+                if(starSystem) starSystem.visible = true; if(moon) moon.visible = true;
+                btn.innerText = "☀️"; btn.style.backgroundColor = "rgba(255,255,0,0.3)";
+            }
+        };
+
+        const STATIC_PROPS = [
+            { id: 'house', file: '3dmodels/house.gltf', pos: {x:0.000, y:0.000, z:0.000}, rot: {x:0.000, y:0.000, z:0.000}, scl: 1.000, color: '#ffffff', rough: 0.5 },
+            { id: 'cousin', file: '3dmodels/charecters/cousin.gltf', pos: {x:14.380, y:1.220, z:16.320}, rot: {x:1.540, y:3.140, z:1.500}, scl: 2.200, color: '#ffffff', rough: 1 },
+            { id: 'nishi', file: '3dmodels/charecters/nishi.gltf', pos: {x:6.000, y:1.000, z:2.000}, rot: {x:0.000, y:0.000, z:0.000}, scl: 1.300, color: '#ffffff', rough: 1 },
+            { id: 'ayna', file: '3dmodels/appliances/ayna.gltf', pos: {x:17.300, y:1.430, z:4.400}, rot: {x:0.000, y:-1.500, z:0.000}, scl: 1.000, color: '#ffffff', rough: 0 }
+        ];
+
+        const INTERACTIVE_DOORS = [
+            { id: 0, pos: {x:7.780, y:0.000, z:0.090}, rot: 3.130 },
+            { id: 1, pos: {x:11.380, y:0.000, z:5.760}, rot: -1.560 },
+            { id: 2, pos: {x:11.450, y:0.000, z:9.770}, rot: -1.560 },
+        ];
+
+        let assetsLoaded = 0; const totalAssets = STATIC_PROPS.length + 2; // +1 door, +1 cab
+        init();
+
+        function init() { 
+            createSky(); build3DForest(); 
+            STATIC_PROPS.forEach(item => loadProp(item)); 
+            loadDoorSystem(); 
+            loadInteractiveCab();
+            animate(); 
+        }
+
+        function checkLoadProgress() {
+            assetsLoaded++; const percent = (assetsLoaded / totalAssets) * 100;
+            document.getElementById('loading-fill').style.width = percent + "%";
+            document.getElementById('loading-text').innerText = Math.floor(percent) + "%";
+            if(assetsLoaded >= totalAssets) { setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; camera.position.set(2, 2.5, 2); }, 500); }
+        }
+
+        function loadProp(item) {
+            gltfLoader.load('file:///android_asset/texture/' + item.file, (gltf) => {
+                const model = gltf.scene;
+                model.position.set(item.pos.x, item.pos.y, item.pos.z); 
+                if(typeof item.rot === 'object') { model.rotation.set(item.rot.x, item.rot.y, item.rot.z); } else { model.rotation.y = item.rot; }
+                model.scale.set(item.scl, item.scl, item.scl);
+                const col = item.color || "#ffffff"; const rough = item.rough !== undefined ? item.rough : 0.5;
+                model.traverse((c) => { if(c.isMesh) { c.material.color.set(new THREE.Color(col)); c.material.roughness = rough; } });
+                scene.add(model); model.userData.originalFile = item.file;
+                if(item.id === 'house') {
+                    model.traverse((child) => { if (child.isMesh) { const name = child.name.toLowerCase(); if(name.includes('bas')) child.material.map = texBas; else if(name.includes('bed_kat')) child.material.map = texBedKat; else if(name.includes('kat')) child.material.map = texKat; child.material.needsUpdate = true; child.material.side = THREE.DoubleSide; child.geometry.computeVertexNormals(); collidableMeshList.push(child); } });
+                } else {
+                    const box = new THREE.Box3().setFromObject(model); const size = new THREE.Vector3(); box.getSize(size);
+                    const center = new THREE.Vector3(); box.getCenter(center); const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+                    const collider = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ visible: false })); collider.position.copy(center);
+                    scene.add(collider); collidableMeshList.push(collider);
+                }
+                targets.push({ id: item.id, name: item.id.toUpperCase(), obj: model }); checkLoadProgress();
+            }, undefined, () => checkLoadProgress());
+        }
+
+        function loadDoorSystem() {
+            gltfLoader.load('file:///android_asset/texture/3dmodels/door.gltf', (gltf) => {
+                const doorMaster = gltf.scene; const doorClip = gltf.animations.length > 0 ? gltf.animations[0] : null;
+                INTERACTIVE_DOORS.forEach(data => { spawnDoor(doorMaster, doorClip, data.id, data.pos, data.rot); });
+                checkLoadProgress();
+            }, undefined, () => checkLoadProgress());
+        }
+
+        function spawnDoor(model, clip, index, pos, rot) {
+            const door = model.clone(); door.position.set(pos.x, pos.y, pos.z); door.rotation.y = rot;
+            door.traverse(child => { if(child.isMesh) { child.material.side = THREE.DoubleSide; child.geometry.computeVertexNormals(); child.userData.parentDoorIndex = index; collidableMeshList.push(child); interactionList.push(child); } });
+            scene.add(door); targets.push({ id: 'door'+index, name: 'DOOR '+index, obj: door });
+            const sound = new THREE.PositionalAudio(listener); door.add(sound); doorSounds[index] = sound;
+            if(clip) { const mixer = new THREE.AnimationMixer(door); const action = mixer.clipAction(clip); action.clampWhenFinished = true; action.setLoop(THREE.LoopOnce); action.reset(); action.time = 0; action.play(); mixer.update(0); action.paused = true; doorMixers[index] = mixer; doorActions[index] = action; }
+        }
+
+        function loadInteractiveCab() {
+            gltfLoader.load('file:///android_asset/texture/3dmodels/appliances/cab.gltf', (gltf) => {
+                const cab = gltf.scene; const index = 3; 
+                cab.position.set(2.400, 0.000, 8.280); cab.rotation.set(0.000, -1.600, 0.000); cab.scale.set(0.7, 0.7, 0.7);
+                cab.userData.drawers = [];
+                cab.traverse(child => {
+                    if(child.isMesh) {
+                        child.material.color.set(new THREE.Color('#ff0000')); child.material.roughness = 0.4;
+                        child.userData.parentDoorIndex = index; collidableMeshList.push(child); interactionList.push(child);
+                        if(child.name.toLowerCase().includes("drawer1") || child.name.toLowerCase().includes("drawer2")) cab.userData.drawers.push(child);
+                    }
+                });
+                scene.add(cab); targets.push({ id: 'cab', name: 'CABINET', obj: cab }); checkLoadProgress();
+            }, undefined, () => checkLoadProgress());
+        }
+
+        function toggleDoor(idx) {
+            if (idx < 3) {
+                const action = doorActions[idx]; if(!action) return;
+                const sound = doorSounds[idx]; if(sound && doorSoundBuffer) { if(sound.isPlaying) sound.stop(); sound.setBuffer(doorSoundBuffer); sound.play(); }
+                action.paused = false;
+                if (!doorStates[idx]) { action.reset(); action.timeScale = 1; action.play(); doorStates[idx] = true; } 
+                else { action.timeScale = -1; if (action.time === 0) action.time = action.getClip().duration; action.play(); doorStates[idx] = false; }
+            } else if (idx === 3) {
+                const cabTarget = targets.find(t => t.id === 'cab'); if (!cabTarget) return;
+                const isOpen = doorStates[idx]; const dist = 0.4;
+                cabTarget.obj.userData.drawers.forEach(d => { if(!isOpen) d.position.z += dist; else d.position.z -= dist; });
+                doorStates[idx] = !isOpen;
+                if (doorSoundBuffer) { const s = new THREE.Audio(listener); s.setBuffer(doorSoundBuffer); s.play(); }
+            }
+        }
+
+        document.getElementById('flashlight-btn').addEventListener('touchstart', () => {
+            isFlashlightOn = !isFlashlightOn; flashlight.intensity = isFlashlightOn ? 2.0 : 0;
+            document.getElementById('flashlight-btn').style.backgroundColor = isFlashlightOn ? "rgba(255, 255, 200, 0.6)" : "rgba(0,0,0,0.5)";
+        });
+
+        const btn = document.getElementById('interact-btn');
+        btn.addEventListener('touchstart', () => {
+            if (listener.context.state === 'suspended') listener.context.resume();
+            if (lookedAtDoorIndex === -1) return;
+            if (lookedAtDoorIndex === 0 && !doorStates[0]) { document.getElementById('choice-modal').style.display = 'flex'; return; }
+            toggleDoor(lookedAtDoorIndex);
+        });
+
+        window.handleChoice = function() { document.getElementById('choice-modal').style.display = 'none'; toggleDoor(0); };
+        window.closeModal = function() { document.getElementById('choice-modal').style.display = 'none'; };
+
+        const joyZone=document.getElementById('joystick-zone'); let joyId=null;
+        joyZone.addEventListener('touchstart', e=>{ if (listener.context.state === 'suspended') listener.context.resume(); joyId=e.changedTouches[0].identifier; });
+        joyZone.addEventListener('touchmove', e=>{ for(let t of e.changedTouches) if(t.identifier===joyId) { const r=joyZone.getBoundingClientRect(), dx=t.clientX-(r.left+r.width/2), dy=t.clientY-(r.top+r.height/2); const ang=Math.atan2(dy, dx); moveSide=-(Math.cos(ang)*PLAYER_SPEED); moveFwd=-(Math.sin(ang)*PLAYER_SPEED); document.getElementById('joystick-knob').style.transform=`translate(calc(-50% + ${Math.cos(ang)*20}px), calc(-50% + ${Math.sin(ang)*20}px))`; } });
+        joyZone.addEventListener('touchend', () => { moveFwd=0; moveSide=0; joyId=null; document.getElementById('joystick-knob').style.transform='translate(-50%, -50%)'; });
+
+        const lookZone=document.getElementById('look-zone'); let lookId=null, lx=0, ly=0;
+        lookZone.addEventListener('touchstart', e=>{ lookId=e.changedTouches[0].identifier; lx=e.changedTouches[0].clientX; ly=e.changedTouches[0].clientY; });
+        lookZone.addEventListener('touchmove', e=>{ for(let t of e.changedTouches) if(t.identifier===lookId) { camera.rotation.y-=(t.clientX-lx)*0.005; camera.rotation.x-=(t.clientY-ly)*0.005; lx=t.clientX; ly=t.clientY; } });
+
+        window.cycleTarget = function() { targetIndex = (targetIndex + 1) % targets.length; document.getElementById('btn-target').innerText = "TARGET: " + targets[targetIndex].name; };
+        window.adjust = function(mode, axis, dir) { const t = targets[targetIndex]; if(!t) return; const val = dir * step; if(mode === 'pos') { if(axis === 0) t.obj.position.y += val; if(axis === 1) t.obj.position.x += val; if(axis === 2) t.obj.position.z += val; } else if (mode === 'rot') { if(axis === 0) t.obj.rotation.x += val; if(axis === 1) t.obj.rotation.y += val; if(axis === 2) t.obj.rotation.z += val; } };
+        window.toggleStep = function() { step = step === 0.1 ? 0.01 : (step === 0.01 ? 0.5 : 0.1); document.getElementById('btn-step').innerText = step; };
+        window.closeExport = function() { document.getElementById('export-overlay').style.display = 'none'; };
+
+        function checkPhysics(pMove) {
+            const nX = camera.position.x + pMove.x, nZ = camera.position.z + pMove.z;
+            const wallRay = new THREE.Raycaster(camera.position, pMove.clone().normalize(), 0, 0.85);
+            if (wallRay.intersectObjects(collidableMeshList).length > 0) return new THREE.Vector3(0,0,0);
+            for (let tr of treeColliders) { if (Math.sqrt((nX-tr.x)**2 + (nZ-tr.z)**2) < tr.radius) return new THREE.Vector3(0,0,0); }
+            return pMove;
+        }
+
+        function checkFloor() {
+            const downRay = new THREE.Raycaster(camera.position, new THREE.Vector3(0,-1,0), 3);
+            const hits = downRay.intersectObjects(collidableMeshList);
+            if (hits.length > 0) { const targetY = hits[0].point.y + PLAYER_HEIGHT; camera.position.y = Math.max(camera.position.y - 0.1, targetY); }
+            if (camera.position.y < PLAYER_HEIGHT) camera.position.y = PLAYER_HEIGHT;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate); const delta = clock.getDelta(); frameCount++; doorMixers.forEach(m => m && m.update(delta));
+            if(flashlight) { const look = new THREE.Vector3(); camera.getWorldDirection(look); flashlight.position.copy(camera.position); flashlight.target.position.copy(camera.position).add(look.multiplyScalar(5)); }
+            if (moveFwd !== 0 || moveSide !== 0) {
+                const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y=0; dir.normalize();
+                const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
+                const move = checkPhysics(new THREE.Vector3().addScaledVector(dir, moveFwd).addScaledVector(side, moveSide));
+                camera.position.add(move);
+                if (move.length() > 0 && footstepSound) { footstepTimer += delta; if (footstepTimer >= footstepInterval) { if (footstepSound.isPlaying) footstepSound.stop(); footstepSound.play(); footstepTimer = 0; } }
+            }
+            checkFloor();
+            if (frameCount % 10 === 0) { raycaster.setFromCamera(center, camera); raycaster.far = 3.0; const hits = raycaster.intersectObjects(interactionList, true); if (hits.length > 0) { lookedAtDoorIndex = hits[0].object.userData.parentDoorIndex; btn.style.display = 'flex'; } else { lookedAtDoorIndex = -1; btn.style.display = 'none'; } }
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
